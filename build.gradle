@@ -1,0 +1,155 @@
+plugins {
+	id 'java'
+	id 'maven-publish'
+	id 'fabric-loom' version '1.5-SNAPSHOT'// apply false
+	id 'ploceus' version '1.5-SNAPSHOT'// apply false
+}
+
+repositories {
+	maven {
+		name = "Quilt"
+		url = "https://maven.quiltmc.org/release"
+	}
+}
+
+base {
+	archivesName = "${project.archives_base_name}-${project.environment}"
+}
+version = "${project.version}+mc${project.minecraft_version}"
+group = project.maven_group
+
+repositories {
+	// Add repositories to retrieve artifacts from in here.
+	// You should only use this when depending on other mods because
+	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
+	// for more information about repositories.
+	maven { url 'https://mcphackers.github.io/libraries/' }
+}
+
+ploceus {
+	clientOnlyMappings()
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	/*
+	mappings loom.layered {
+		//addLayer ploceus.mcpMappings('stable', '1.12', '39')
+
+		mappings "net.ornithemc:feather:${project.minecraft_version}-${project.environment}+build.${project.feather_build}:v2"
+		//addLayer ploceus.nestedMappings() // remove this line if not using nests
+	}
+	*/
+
+	// Use a local feather mapping build
+	mappings loom.layered {
+		mappings file('unmerged-named-v2-with-enum.tiny')
+	}
+
+	//nests "net.ornithemc:nests:${project.minecraft_version}-${project.environment}+build.${project.nests_build}" // remove this line if not using nests
+
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	//modImplementation "com.terraformersmc:modmenu:${project.mod_menu_version}"
+	implementation 'com.google.code.findbugs:jsr305:3.0.2'
+	implementation 'org.apache.logging.log4j:log4j-api:2.22.1'
+	implementation 'org.apache.logging.log4j:log4j-core:2.22.1'
+	implementation 'com.mojang:authlib:1.5.22'
+	//compileOnly group: 'com.mojang', name: 'authlib', version: '1.5.22'
+
+	// Dependencies for LaunchWrapper: https://github.com/MCPHackers/LaunchWrapper
+	implementation 'org.json:json:20230311'
+	implementation 'org.mcphackers.rdi:rdi:1.0'
+	//implementation file('local_libs/launchwrapper-1.0-SNAPSHOT.jar')
+	//implementation file('local_libs/launchwrapper-fabric-1.0-SNAPSHOT.jar')
+	implementation fileTree(dir: 'local_libs', include: '*.jar')
+
+	project.ploceus.addCommonLibraries();
+	//ploceus.dependOsl(project.osl_version)
+	//ploceus.dependOsl(project.osl_version, project.environment)
+}
+
+loom {
+	accessWidenerPath = file("src/main/resources/malilib.accesswidener")
+
+	clientOnlyMinecraftJar()
+
+	decompilers {
+		vineflower {
+			options.put("ind", "	")
+			//preferences {
+			//	ind = '	'
+			//}
+		}
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs += sourceSets.main.java.srcDirs
+		}
+		resources {
+			srcDirs += sourceSets.main.resources.srcDirs
+		}
+	}
+}
+
+/*
+processResources {
+	filesMatching('fabric.mod.json') {
+		expand properties
+	}
+}
+*/
+
+processResources {
+	inputs.property 'version', version
+
+	filesMatching('fabric.mod.json') {
+		expand 'version': version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = 'UTF-8'
+	it.options.release = 8
+}
+
+java {
+	// Still required by IDEs such as Eclipse and Visual Studio Code
+	sourceCompatibility = JavaVersion.VERSION_1_8
+	targetCompatibility = JavaVersion.VERSION_1_8
+
+	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task if it is present.
+	// If you remove this line, sources will not be generated.
+	withSourcesJar()
+
+	// If this mod is going to be a library, then it should also generate Javadocs in order to aid with development.
+	// Uncomment this line to generate them.
+	// withJavadocJar()
+}
+
+// If you plan to use a different file for the license, don't forget to change the file name here!
+jar {
+	from('LICENSE') {
+		rename { "${it}_${project.base.archivesName.get()}" }
+	}
+}
+
+// Configure the maven publication
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			from project.components.java
+		}
+	}
+
+	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+	repositories {
+		// Add repositories to publish to here.
+		// Notice: This block does NOT have the same function as the block in the top level.
+		// The repositories here will be used for publishing your artifact, not for
+		// retrieving dependencies.
+	}
+}
